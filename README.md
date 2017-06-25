@@ -7,6 +7,8 @@ and achieved more stable and short GC pause latency by fixing them afterwards.
 
 ## Build
 
+Notice: This tool is developed base on the golang release v1.8.3.
+
 Same as [build golang from source](https://golang.org/doc/install/source).
 
 ```bash
