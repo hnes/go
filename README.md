@@ -3,6 +3,8 @@ which means "diagnoses and finds out the greediest several goroutines". This too
 already helped us tracked down several deep hiden problems in our go applications 
 and achieved more stable and short GC pause latency by fixing them afterwards.
 
+(You could discuss this feature proposal in this [go issue](https://github.com/golang/go/issues/20792) if you want it in the next release of golang.)
+
 ## Terminology
 ```
 N        = GOMAXPROCS 
