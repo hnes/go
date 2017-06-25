@@ -44,6 +44,9 @@ Flags:
         -dump: dump all traced out as format text to stdout    <---
         -diagreedy=N: dump the topest N greedy goroutines      <--- you would see the new options 
 ```
+
+Then there is a more detailed [example](#example).
+
 ## Terminology
 ```
 N        = GOMAXPROCS 
