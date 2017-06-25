@@ -20,7 +20,9 @@ script:
     - export GOROOT_BOOTSTRAP=$GOROOT
     - echo $GOROOT_BOOTSTRAP $GOROOT
     - cd src
-    - ./all.bash
+    - ./make.bash
     - echo ":)"
+    - cd ../bin
+    - ldd go
+    - ./go tool trace -h
     - date
-    - echo trigger
