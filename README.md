@@ -5,6 +5,45 @@ and achieved more stable and short GC pause latency by fixing them afterwards.
 
 (You could discuss this feature proposal in this [go issue](https://github.com/golang/go/issues/20792) if you want it in the next release of golang.)
 
+## Build
+
+Same as [build golang from source](https://golang.org/doc/install/source).
+
+```bash
+$ cd src
+$ ./all.bash
+```
+
+After build and test, then:
+
+```
+$ cd ../bin 
+$ ./go tool trace -h
+Usage of 'go tool trace':
+Given a trace file produced by 'go test':
+        go test -trace=trace.out pkg
+
+Open a web browser displaying trace:
+        go tool trace [flags] [pkg.test] trace.out
+
+Generate a pprof-like profile from the trace:
+    go tool trace -pprof=TYPE [pkg.test] trace.out
+
+[pkg.test] argument is required for traces produced by Go 1.6 and below.
+Go 1.7 does not require the binary argument.
+
+Supported profile types are:
+    - net: network blocking profile
+    - sync: synchronization blocking profile
+    - syscall: syscall blocking profile
+    - sched: scheduler latency profile
+
+Flags:
+        -http=addr: HTTP service address (e.g., ':6060')
+        -pprof=type: print a pprof-like profile instead
+        -dump: dump all traced out as format text to stdout    <---
+        -diagreedy=N: dump the topest N greedy goroutines      <--- you would see the new options 
+```
 ## Terminology
 ```
 N        = GOMAXPROCS 
@@ -13,6 +52,7 @@ Tmax_stw = sum{top max N on-processor time slices}
 
 Tgc      = Tmax_stw + Tgcwork
 ```
+
 
 ## Big Picture
 ```
