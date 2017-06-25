@@ -29,6 +29,7 @@ package main
 import (
 	"bufio"
 	"cmd/internal/browser"
+	"container/heap"
 	"flag"
 	"fmt"
 	"html/template"
@@ -38,6 +39,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -64,16 +66,41 @@ Supported profile types are:
 Flags:
 	-http=addr: HTTP service address (e.g., ':6060')
 	-pprof=type: print a pprof-like profile instead
+	-dump: dump all traced out as format text to stdout
+	-diagreedy=N: dump the topest N greedy goroutines
 `
 
 var (
-	httpFlag  = flag.String("http", "localhost:0", "HTTP service address (e.g., ':6060')")
-	pprofFlag = flag.String("pprof", "", "print a pprof-like profile instead")
-
+	httpFlag      = flag.String("http", "localhost:0", "HTTP service address (e.g., ':6060')")
+	pprofFlag     = flag.String("pprof", "", "print a pprof-like profile instead")
+	dumpFlag      = flag.Bool("dump", false, "dump all traced out as format text to stdout")
+	diagreedyFlag = flag.Int("diagreedy", 0, "dump the topest N greedy goroutines")
 	// The binary file name, left here for serveSVGProfile.
 	programBinary string
 	traceFile     string
 )
+
+type greedyGoroutine struct {
+	deltaNano int64
+	ep        *trace.Event
+}
+type topestGreedyHeap []*greedyGoroutine
+
+func (h topestGreedyHeap) Len() int           { return len(h) }
+func (h topestGreedyHeap) Less(i, j int) bool { return h[i].deltaNano < h[j].deltaNano }
+func (h topestGreedyHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *topestGreedyHeap) Push(x interface{}) {
+	*h = append(*h, x.(*greedyGoroutine))
+}
+
+func (h *topestGreedyHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
 
 func main() {
 	flag.Usage = func() {
@@ -115,17 +142,176 @@ func main() {
 		dief("unknown pprof type %s\n", *pprofFlag)
 	}
 
-	ln, err := net.Listen("tcp", *httpFlag)
-	if err != nil {
-		dief("failed to create server socket: %v\n", err)
+	if *dumpFlag == false && *diagreedyFlag == 0 {
+		log.Printf("Parsing trace...")
 	}
-
-	log.Printf("Parsing trace...")
 	events, err := parseEvents()
 	if err != nil {
 		dief("%v\n", err)
 	}
-
+	if *diagreedyFlag > 0 {
+		h := &topestGreedyHeap{}
+		heap.Init(h)
+		stkmap := make(map[*trace.Event]*trace.Event)
+		wholinkmemap := make(map[*trace.Event]*trace.Event)
+		if h.Len() != 0 {
+			dief("heap len is not zero after init\n")
+			os.Exit(1)
+		}
+		max := *diagreedyFlag
+		if max <= 0 {
+			dief("diagreedyFlag N must be bigger than 0\n")
+			os.Exit(1)
+		}
+		l := len(events)
+		for i := 0; i < l; i++ {
+			var p *trace.Event = events[i]
+			if p.Link != nil {
+				wholinkmemap[p.Link] = p
+			}
+			if len(p.Stk) > 0 && p.Link != nil {
+				if p.Link.Type == trace.EvGoStart || p.Link.Type == trace.EvGoStartLabel {
+					stkmap[p.Link] = p
+				}
+			}
+			if p.Type == trace.EvGoStart || p.Type == trace.EvGoStartLabel {
+				if p.Link == nil {
+					dief("found one " + trace.EventDescriptions[p.Type].Name +
+						" event had a nil link")
+					os.Exit(1)
+				}
+				ggp := &greedyGoroutine{p.Link.Ts - p.Ts, p}
+				if ggp.deltaNano < 0 {
+					dief("found one deltaNano is less than zero")
+					os.Exit(1)
+				}
+				for h.Len() > max {
+					heap.Pop(h)
+				}
+				if h.Len() == max {
+					ggp_old := heap.Pop(h)
+					if (ggp_old.(*greedyGoroutine)).deltaNano < ggp.deltaNano {
+						heap.Push(h, ggp)
+					} else {
+						heap.Push(h, ggp_old)
+					}
+				} else {
+					heap.Push(h, ggp)
+				}
+			}
+		}
+		{
+			toppest_greedy_list := make([]*greedyGoroutine, 0, 10)
+			l := h.Len()
+			for h.Len() > 0 {
+				ggp := heap.Pop(h)
+				toppest_greedy_list = append(toppest_greedy_list, (ggp.(*greedyGoroutine)))
+			}
+			if l != len(toppest_greedy_list) {
+				dief("toppest_greedy_list is not equal with ev heap")
+				os.Exit(1)
+			}
+			fmt.Printf("finally the found toppest %d greedy goroutines info\n", l)
+			for i := l - 1; i >= 0; i-- {
+				fmt.Printf("\t%dns -> %fs \n",
+					toppest_greedy_list[i].deltaNano,
+					float64(toppest_greedy_list[i].deltaNano)/1e9)
+				p := toppest_greedy_list[i].ep
+				pf := func() {
+					fmt.Print(
+						"\t\t", trace.EventDescriptions[p.Type].Name,
+						" Ts: ", p.Ts, " P: ", p.P, " G: ", p.G,
+						" StkID: ", p.StkID, " args0: ", p.Args[0], " args1: ", p.Args[1],
+						" args2: ", p.Args[2], "\n")
+					{
+						p := p
+						l := len(p.Stk)
+						linkl := make([]string, 0, 10)
+						if l <= 0 {
+							thisp := p
+							prep := wholinkmemap[thisp]
+							ct := 0
+							for ; prep != nil && ct < 10; ct++ {
+								linkl = append(linkl, trace.EventDescriptions[prep.Type].Name)
+								if len(prep.Stk) > 0 {
+									p = prep
+									l = len(prep.Stk)
+									break
+								}
+								thisp = prep
+								prep = wholinkmemap[thisp]
+							}
+							/*
+								np := stkmap[p]
+								if np != nil && len(np.Stk) > 0 {
+									l = len(p.Stk)
+									p = np
+								} else {
+								}
+							*/
+						}
+						str := ""
+						linklrevert := make([]string, 0, 10)
+						if l > 0 && len(linkl) > 0 {
+							for i := 0; i < len(linkl); i++ {
+								linklrevert = append(linklrevert, linkl[len(linkl)-1-i])
+							}
+							str = strings.Join(linklrevert, " -> ")
+							str = str
+						}
+						if str != "" {
+							fmt.Println("\t\t\t", str)
+						}
+						for i := 0; l > 0 && i < l && p != nil; i++ {
+							fmt.Println("\t\t\t",
+								p.Stk[i].PC, p.Stk[i].Fn,
+								p.Stk[i].File, p.Stk[i].Line)
+						}
+					}
+					{
+						l := len(p.SArgs)
+						for i := 0; i < l; i++ {
+							fmt.Println("\t\t\t", p.SArgs[i])
+						}
+					}
+				}
+				pf()
+				p = p.Link
+				pf()
+			}
+		}
+	}
+	if *dumpFlag == true {
+		fmt.Println("dump")
+		l := len(events)
+		for i := 0; i < l; i++ {
+			var p *trace.Event = events[i]
+			fmt.Printf("\t%p ", p)
+			fmt.Print(
+				"Off: ", p.Off, " type: ", p.Type, " ", trace.EventDescriptions[p.Type].Name,
+				" Ts: ", p.Ts, " P: ", p.P, " G: ", p.G,
+				" StkID: ", p.StkID, " args0: ", p.Args[0], " args1: ", p.Args[1],
+				" args2: ", p.Args[2])
+			fmt.Printf(" link: %p \n", p.Link)
+			{
+				l := len(p.Stk)
+				for i := 0; i < l; i++ {
+					fmt.Println("\t\t",
+						p.Stk[i].PC, p.Stk[i].Fn,
+						p.Stk[i].File, p.Stk[i].Line)
+				}
+			}
+			{
+				l := len(p.SArgs)
+				for i := 0; i < l; i++ {
+					fmt.Println("\t\t", p.SArgs[i])
+				}
+			}
+		}
+	}
+	if *diagreedyFlag > 0 || *dumpFlag == true {
+		os.Exit(0)
+	}
 	log.Printf("Serializing trace...")
 	params := &traceParams{
 		events:  events,
@@ -138,6 +324,11 @@ func main() {
 
 	log.Printf("Splitting trace...")
 	ranges = splitTrace(data)
+
+	ln, err := net.Listen("tcp", *httpFlag)
+	if err != nil {
+		dief("failed to create server socket: %v\n", err)
+	}
 
 	log.Printf("Opening browser")
 	if !browser.Open("http://" + ln.Addr().String()) {
