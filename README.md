@@ -1,4 +1,4 @@
-I have implemented a sub-optio in the `go tool trace` recently named "diagreedy" 
+This project is about a new sub-optio in the `go tool trace` named "diagreedy" 
 which means "diagnoses and finds out the greediest several goroutines". This tool 
 already helped us tracked down several deep hiden problems in our go applications 
 and achieved more stable and short GC pause latency by fixing them afterwards.
@@ -535,3 +535,9 @@ $ go tool trace -dump /root/go/src/diaggreedy/trace_my_2017-06-25-10-03-15.out
 
         # ......
 ```
+
+## Reference
+
+https://groups.google.com/forum/#!topic/golang-nuts/8KYER1ALelg
+
+https://github.com/golang/go/issues/10958
