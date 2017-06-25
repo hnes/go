@@ -67,14 +67,14 @@ Flags:
 	-http=addr: HTTP service address (e.g., ':6060')
 	-pprof=type: print a pprof-like profile instead
 	-dump: dump all traced out as format text to stdout
-	-diagreedy=N: dump the topest N greedy goroutines
+	-diagreedy=N: dump the top N greedy goroutines
 `
 
 var (
 	httpFlag      = flag.String("http", "localhost:0", "HTTP service address (e.g., ':6060')")
 	pprofFlag     = flag.String("pprof", "", "print a pprof-like profile instead")
 	dumpFlag      = flag.Bool("dump", false, "dump all traced out as format text to stdout")
-	diagreedyFlag = flag.Int("diagreedy", 0, "dump the topest N greedy goroutines")
+	diagreedyFlag = flag.Int("diagreedy", 0, "dump the top N greedy goroutines")
 	// The binary file name, left here for serveSVGProfile.
 	programBinary string
 	traceFile     string
