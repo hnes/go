@@ -83,7 +83,7 @@ the sources of the long GC pause immediately and fix them like this:
 Then our Tmax_stw would turns from GOMAXPROCS*1 ms to GOMAXPROCS/5 ms afterwards :)
 (If your GOMAXPROCS is very big, just splits do_cpu_staff even further. And you even
 could implement some logic which would let the do_cpu_staff automated splits its tasks
-based on the value of GOMAXPROCS and a other parameter could named time_cost_wated to 
+based on the value of GOMAXPROCS and a other parameter could named time_cost_wanted to 
 solve this problem for good.)
 
 ## Example
