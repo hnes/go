@@ -131,6 +131,24 @@ could implement some logic which would let the do_cpu_staff automated splits its
 based on the value of GOMAXPROCS and a other parameter could named time_cost_wanted to 
 solve this problem for good.)
 
+### revision1
+
+Sorry, I might had make a mistake:
+
+    Tmax_stw = sum{top max N on-processor time slices}
+
+It should probably be:
+    
+    Tmax_stw = max{top max N on-processor time slices}
+
+Although I hadn't dive in the go scheduler's code yet, but 
+I guess the 2nd is most likely the right answer, because the 
+1st algorithm is just too inefficient and unlikely using by the 
+go scheduler.
+
+But no matter which one is the right answer, the 1st one or the 
+2nd, it couldn't change our conclusion made before utterly.
+
 ## Example
 
 And there is a example about the usage of `go tool trace -diagreedy`
