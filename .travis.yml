@@ -12,7 +12,6 @@ go:
 
 compiler:
   - gcc
-  - clang
 
 install:
     - sudo apt-get install -qq -y libreadline-dev libncurses5-dev libpcre3-dev libssl-dev perl make build-essential
