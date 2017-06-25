@@ -45,7 +45,7 @@ Flags:
         -diagreedy=N: dump the topest N greedy goroutines      <--- you would see the new options 
 ```
 
-Then there is a more detailed [example](#example).
+There is a more detailed [example](#example).
 
 ## Terminology
 ```
@@ -160,7 +160,7 @@ Flags:
         -dump: dump all traced out as format text to stdout   <-
         -diagreedy=N: dump the top N greedy goroutines     <- new added options
 ```
-code to diagnose latterly:
+Sample code to diagnose latterly:
 ```bash
 package main
 
