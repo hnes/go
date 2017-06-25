@@ -1,4 +1,4 @@
-This project is about a new sub-optio in the `go tool trace` named "diagreedy" 
+This project is about a new sub-option in the `go tool trace` named "diagreedy" 
 which means "diagnoses and finds out the greediest several goroutines". This tool 
 already helped us tracked down several deep hiden problems in our go applications 
 and achieved more stable and short GC pause latency by fixing them afterwards.
